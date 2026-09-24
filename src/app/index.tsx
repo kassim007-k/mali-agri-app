@@ -1,98 +1,108 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { StyleSheet, TouchableOpacity, View, Text, SafeAreaView } from 'react-native';
+import { Colors, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+export default function WelcomeScreen() {
+  const theme = useTheme();
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+  const handlePress = () => {
+    router.replace('/(tabs)/home');
+  };
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <SafeAreaView style={[styles.container, { backgroundColor: Colors.light.primary }]}>
+      <View style={styles.content}>
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoText}>AF</Text>
+          <View style={styles.logoLine} />
+        </View>
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+        <Text style={styles.title}>AfriFarm: Agri-Élevage Solidaire</Text>
+        <Text style={styles.slogan}>Éduquer - Connecter - Cultiver</Text>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <View style={styles.divider}>
+          <View style={styles.line} />
+          <Text style={styles.dividerIcon}>✧</Text>
+          <View style={styles.line} />
+        </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: Colors.light.accent }]}
+          onPress={handlePress}
+        >
+          <Text style={styles.buttonText}>Commencer</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
   },
-  safeArea: {
+  content: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
     paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.two,
+  },
+  logoText: {
+    fontSize: 80,
+    fontWeight: 'bold',
+    color: '#D8823B',
+  },
+  logoLine: {
+    width: 60,
+    height: 4,
+    backgroundColor: '#D8823B',
+    marginTop: -10,
   },
   title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
     textAlign: 'center',
+    marginTop: Spacing.four,
   },
-  code: {
-    textTransform: 'uppercase',
+  slogan: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    opacity: 0.8,
+    marginTop: Spacing.one,
+    fontStyle: 'italic',
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Spacing.six,
+    width: '60%',
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#D8823B',
+  },
+  dividerIcon: {
+    color: '#D8823B',
+    paddingHorizontal: 10,
+    fontSize: 20,
+  },
+  button: {
+    width: '100%',
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: Spacing.four,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
   },
 });
