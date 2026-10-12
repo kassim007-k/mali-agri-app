@@ -3,26 +3,23 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, Aler
 import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
-import { normalizePhoneNumber } from '@/features/auth/phone';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginScreen() {
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    const normalizedPhone = normalizePhoneNumber(phone);
-    if (!normalizedPhone || !password) {
-      Alert.alert('Numéro invalide', 'Saisissez un numéro malien à 8 chiffres ou un numéro international au format + indicatif.');
+    if (!email.trim() || !password) {
+      Alert.alert('Champs requis', 'Veuillez saisir votre email et votre mot de passe.');
       return;
     }
 
     setLoading(true);
 
-    // Pour se connecter avec le téléphone et le mot de passe sur Supabase
     const { error } = await supabase.auth.signInWithPassword({
-      phone: normalizedPhone,
+      email: email.trim(),
       password: password,
     });
 
@@ -46,19 +43,18 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.label}>Numéro de téléphone</Text>
+        <Text style={styles.label}>Adresse Email</Text>
         <TextInput
           style={styles.input}
-          placeholder="+223XXXXXXXX"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
+          placeholder="votre@email.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
           autoCapitalize="none"
-          autoComplete="tel"
-          textContentType="telephoneNumber"
+          autoComplete="email"
+          textContentType="emailAddress"
           editable={!loading}
         />
-        <Text style={styles.hint}>Mali : 8 chiffres ou +223 suivi du numéro. Autres pays : ajoutez l’indicatif international.</Text>
 
         <Text style={styles.label}>Mot de passe</Text>
         <TextInput

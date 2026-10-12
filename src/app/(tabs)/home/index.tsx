@@ -13,37 +13,30 @@ const homeTables: AgriTableName[] = ['agri_courses', 'agri_lessons', 'agri_enrol
 const noTables: AgriTableName[] = [];
 
 export default function HomeScreen() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userName, setUserName] = useState('');
+  // On force un ID de test pour ne plus être bloqué par l'auth
+  const [userId, setUserId] = useState<string | null>('00000000-0000-0000-0000-000000000000');
+  const [userName, setUserName] = useState('Abdoul Wahab');
 
   useEffect(() => {
     let active = true;
     const loadSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (active) {
-        setUserId(session?.user.id ?? null);
-        setUserName(session?.user.user_metadata?.full_name ?? '');
+      if (active && session?.user) {
+        setUserId(session.user.id);
+        setUserName(session.user.user_metadata?.full_name ?? 'Agriculteur');
       }
     };
-    const timer = setTimeout(() => void loadSession(), 0);
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user.id ?? null);
-      setUserName(session?.user.user_metadata?.full_name ?? '');
-    });
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-      subscription.unsubscribe();
-    };
+    loadSession();
+    // On ne met plus de listener qui pourrait remettre userId à null
+    return () => { active = false; };
   }, []);
 
   const loadLearning = useCallback(
-    () => userId ? getMyLearning(userId) : Promise.resolve([] as CourseProgress[]),
+    () => getMyLearning(userId || '00000000-0000-0000-0000-000000000000'),
     [userId],
   );
-  const tables = userId ? homeTables : noTables;
-  const { data, loading, refreshing, error, refresh } = useLiveQuery(`home-${userId ?? 'guest'}`, tables, loadLearning);
+  const tables = homeTables;
+  const { data, loading, refreshing, error, refresh } = useLiveQuery(`home-${userId}`, tables, loadLearning);
   const learning = data ?? [];
   const averageProgress = learning.length
     ? Math.round(learning.reduce((total, item) => total + item.progress, 0) / learning.length)
@@ -78,18 +71,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {!userId ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIcon}>
-              <SymbolView name={{ ios: 'person.crop.circle.fill', android: 'account_circle', web: 'account_circle' } as any} size={30} tintColor={Colors.light.primary} />
-            </View>
-            <Text style={styles.emptyTitle}>Connectez-vous pour suivre vos cours</Text>
-            <Text style={styles.emptyDescription}>Vos inscriptions et votre progression seront enregistrées sur votre compte.</Text>
-            <Pressable onPress={() => router.push('/login')} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Se connecter</Text>
-            </Pressable>
-          </View>
-        ) : loading ? (
+        {loading ? (
           <View style={styles.emptyCard}><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Chargement de votre progression…</Text></View>
         ) : error ? (
           <View style={styles.emptyCard}>

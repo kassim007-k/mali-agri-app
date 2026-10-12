@@ -3,18 +3,17 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, Aler
 import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
-import { normalizePhoneNumber } from '@/features/auth/phone';
 import { supabase } from '@/lib/supabase';
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!fullName || !phone || !password || !confirmPassword) {
+    if (!fullName || !email || !password || !confirmPassword) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
@@ -23,17 +22,11 @@ export default function RegisterScreen() {
       return;
     }
 
-    const normalizedPhone = normalizePhoneNumber(phone);
-    if (!normalizedPhone) {
-      Alert.alert('Numéro invalide', 'Saisissez un numéro malien à 8 chiffres ou un numéro international au format + indicatif.');
-      return;
-    }
-
     setLoading(true);
 
     try {
       const { data, error } = await supabase.auth.signUp({
-        phone: normalizedPhone,
+        email: email.trim(),
         password,
         options: {
           data: {
@@ -48,7 +41,8 @@ export default function RegisterScreen() {
         Alert.alert('Compte créé', 'Votre compte est prêt.');
         router.replace('/(tabs)/home');
       } else {
-        router.replace({ pathname: '/verify-phone', params: { phone: normalizedPhone } });
+        Alert.alert('Vérifiez vos emails', 'Un lien de confirmation vous a été envoyé.');
+        router.replace('/login');
       }
     } catch {
       Alert.alert('Erreur d’inscription', 'Vérifiez votre connexion puis réessayez.');
@@ -77,19 +71,19 @@ export default function RegisterScreen() {
           editable={!loading}
         />
 
-        <Text style={styles.label}>Numéro de téléphone</Text>
+        <Text style={styles.label}>Adresse Email</Text>
         <TextInput
           style={styles.input}
-          placeholder="+223XXXXXXXX"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
+          placeholder="votre@email.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
           autoCapitalize="none"
-          autoComplete="tel"
-          textContentType="telephoneNumber"
+          autoComplete="email"
+          textContentType="emailAddress"
           editable={!loading}
         />
-        <Text style={styles.hint}>Mali : 8 chiffres ou +223 suivi du numéro. Un code SMS peut être demandé pour confirmer le compte.</Text>
+        <Text style={styles.hint}>Un email de confirmation peut vous être envoyé pour valider votre compte.</Text>
 
         <Text style={styles.label}>Mot de passe</Text>
         <TextInput

@@ -13,7 +13,7 @@ const noTables: AgriTableName[] = [];
 
 export default function ProfileScreen() {
   const [userId, setUserId] = useState<string | null>(null);
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [name, setName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -27,7 +27,7 @@ export default function ProfileScreen() {
           return;
         }
         setUserId(session.user.id);
-        setPhone(session.user.phone ?? '');
+        setEmail(session.user.email ?? '');
       });
     }, 0);
     return () => { active = false; clearTimeout(timer); };
@@ -73,9 +73,9 @@ export default function ProfileScreen() {
         <View style={styles.form}>
           <Text style={styles.label}>Nom complet</Text>
           <TextInput value={name ?? profile?.full_name ?? ''} onChangeText={setName} placeholder="Votre nom" style={styles.input} editable={!saving && !!profile} maxLength={100} />
-          <Text style={styles.label}>Téléphone</Text>
-          <View style={[styles.input, styles.readOnly]}><Text style={styles.readOnlyText}>{phone || 'Non renseigné'}</Text></View>
-          <Text style={styles.help}>Pour modifier votre numéro, contactez l’équipe d’assistance.</Text>
+          <Text style={styles.label}>Adresse Email</Text>
+          <View style={[styles.input, styles.readOnly]}><Text style={styles.readOnlyText}>{email || 'Non renseignée'}</Text></View>
+          <Text style={styles.help}>Pour modifier votre email, contactez l’équipe d’assistance.</Text>
           <Pressable onPress={() => void save()} disabled={saving || !profile} style={[styles.saveButton, (saving || !profile) && styles.disabled]}>
             <Text style={styles.saveText}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</Text>
           </Pressable>

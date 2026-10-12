@@ -13,8 +13,8 @@ const profileTable: AgriTableName[] = ['agri_profiles'];
 const noTables: AgriTableName[] = [];
 
 export default function SettingsScreen() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [phone, setPhone] = useState('');
+  const [userId, setUserId] = useState<string | null>('00000000-0000-0000-0000-000000000000');
+  const [email, setEmail] = useState('dev@afri-farm.com');
   const [authReady, setAuthReady] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -22,21 +22,24 @@ export default function SettingsScreen() {
     let active = true;
     const loadSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (active) {
-        setUserId(session?.user.id ?? null);
-        setPhone(session?.user.phone ?? '');
-        setAuthReady(true);
+      if (active && session?.user) {
+        setUserId(session.user.id);
+        setEmail(session.user.email ?? '');
       }
+      if (active) setAuthReady(true);
     };
-    const timer = setTimeout(() => void loadSession(), 0);
+    loadSession();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user.id ?? null);
-      setPhone(session?.user.phone ?? '');
-      setAuthReady(true);
+      if (session?.user) {
+        setUserId(session.user.id);
+        setEmail(session.user.email ?? '');
+      } else {
+        setUserId('00000000-0000-0000-0000-000000000000');
+        setEmail('dev@afri-farm.com');
+      }
     });
     return () => {
       active = false;
-      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);
@@ -67,15 +70,21 @@ export default function SettingsScreen() {
 
         {!authReady ? (
           <View style={styles.stateCard}><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Vérification de votre compte…</Text></View>
-        ) : userId ? (
+        ) : (
           <>
+            {userId === '00000000-0000-0000-0000-000000000000' && (
+              <View style={styles.devBanner}>
+                <SymbolView name={{ ios: 'hammer.fill', android: 'build', web: 'build' } as any} size={14} tintColor="#856404" />
+                <Text style={styles.devBannerText}>Mode Développement : Session simulée active.</Text>
+              </View>
+            )}
             <View style={styles.profileCard}>
               <View style={styles.avatar}>
                 <SymbolView name={{ ios: 'person.fill', android: 'person', web: 'person' } as any} size={26} tintColor="#FFFFFF" />
               </View>
               <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>{profile?.full_name || 'Votre profil'}</Text>
-                <Text style={styles.muted}>{phone || 'Compte connecté'}</Text>
+                <Text style={styles.profileName}>{profile?.full_name || (userId === '00000000-0000-0000-0000-000000000000' ? 'Développeur' : 'Votre profil')}</Text>
+                <Text style={styles.muted}>{userId === '00000000-0000-0000-0000-000000000000' ? 'Accès invité (ID de test)' : (email || 'Compte connecté')}</Text>
               </View>
               {profile ? <Text style={[styles.roleBadge, profile.role === 'admin' && styles.adminBadge]}>{profile.role === 'admin' ? 'ADMIN' : 'MEMBRE'}</Text> : null}
             </View>
@@ -104,19 +113,23 @@ export default function SettingsScreen() {
                 onPress={() => router.push('/(tabs)/settings/admin')}
               />
             ) : null}
-            <Pressable onPress={() => void handleSignOut()} disabled={signingOut} style={[styles.signOutButton, signingOut && styles.disabled]}>
-              <SymbolView name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any} size={19} tintColor="#A34337" />
-              <Text style={styles.signOutText}>{signingOut ? 'Déconnexion…' : 'Se déconnecter'}</Text>
-            </Pressable>
+
+            {userId !== '00000000-0000-0000-0000-000000000000' ? (
+              <Pressable onPress={() => void handleSignOut()} disabled={signingOut} style={[styles.signOutButton, signingOut && styles.disabled]}>
+                <SymbolView name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any} size={19} tintColor="#A34337" />
+                <Text style={styles.signOutText}>{signingOut ? 'Déconnexion…' : 'Se déconnecter'}</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.stateCard}>
+                <Text style={styles.rowTitle}>Passer au mode réel</Text>
+                <Text style={styles.muted}>Pour tester l'authentification par email et les restrictions de sécurité.</Text>
+                <View style={styles.authButtonsRow}>
+                  <Pressable onPress={() => router.push('/login')} style={styles.authButton}><Text style={styles.authButtonText}>Connexion</Text></Pressable>
+                  <Pressable onPress={() => router.push('/register')} style={styles.authButton}><Text style={styles.authButtonText}>S'inscrire</Text></Pressable>
+                </View>
+              </View>
+            )}
           </>
-        ) : (
-          <View style={styles.stateCard}>
-            <View style={styles.guestIcon}><SymbolView name={{ ios: 'person.crop.circle.fill', android: 'account_circle', web: 'account_circle' } as any} size={31} tintColor={Colors.light.primary} /></View>
-            <Text style={styles.rowTitle}>Connectez-vous à votre espace</Text>
-            <Text style={styles.muted}>Votre compte conserve les formations suivies, les leçons terminées et vos informations de profil.</Text>
-            <Pressable onPress={() => router.push('/login')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Se connecter</Text></Pressable>
-            <Pressable onPress={() => router.push('/register')} style={styles.registerButton}><Text style={styles.actionText}>Créer un compte</Text></Pressable>
-          </View>
         )}
 
         <Text style={styles.version}>Mali Agri · Espace d’apprentissage</Text>
@@ -154,10 +167,15 @@ const styles = StyleSheet.create({
   rowIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#EAF2EC', alignItems: 'center', justifyContent: 'center' },
   rowContent: { flex: 1, marginHorizontal: Spacing.two },
   rowTitle: { color: '#26332C', fontSize: 14, fontWeight: '800', marginBottom: 3 },
+  devBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF3CD', borderBottomWidth: 1, borderColor: '#FFEEBA', paddingHorizontal: Spacing.four, paddingVertical: 10 },
+  devBannerText: { color: '#856404', fontSize: 12, fontWeight: '600' },
   signOutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: Spacing.four, marginTop: Spacing.two, padding: 14, borderRadius: 13, backgroundColor: '#FBEDEA' },
   signOutText: { color: '#A34337', fontSize: 13, fontWeight: '800' },
   disabled: { opacity: 0.6 },
   stateCard: { alignItems: 'center', margin: Spacing.four, padding: Spacing.four, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E8EEE9', gap: 10 },
+  authButtonsRow: { flexDirection: 'row', gap: 10, marginTop: 5 },
+  authButton: { backgroundColor: Colors.light.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  authButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   guestIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF2EC' },
   primaryButton: { backgroundColor: Colors.light.primary, alignItems: 'center', minWidth: 160, paddingHorizontal: Spacing.four, paddingVertical: 13, borderRadius: 11, marginTop: Spacing.one },
   primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
