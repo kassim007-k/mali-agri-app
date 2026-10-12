@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import { SymbolView } from 'expo-symbols';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginScreen() {
+  const { courseId } = useLocalSearchParams<{ courseId?: string | string[] }>();
+  const requestedCourseId = Array.isArray(courseId) ? courseId[0] : courseId;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,11 @@ export default function LoginScreen() {
       setLoading(false);
     } else {
       Alert.alert('Succès', 'Connexion réussie !');
-      router.replace('/(tabs)/home');
+      if (requestedCourseId) {
+        router.replace({ pathname: '/(tabs)/formations/[courseId]', params: { courseId: requestedCourseId } });
+      } else {
+        router.replace('/(tabs)/home');
+      }
     }
   };
 
@@ -76,6 +82,14 @@ export default function LoginScreen() {
           ) : (
             <Text style={styles.buttonText}>Se connecter</Text>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push(requestedCourseId ? { pathname: '/register', params: { courseId: requestedCourseId } } : '/register')}
+          disabled={loading}
+          style={styles.registerLink}
+        >
+          <Text style={styles.registerText}>Pas encore de compte ? Créer un compte</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -131,4 +145,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  registerLink: { alignItems: 'center', paddingVertical: Spacing.three },
+  registerText: { color: Colors.light.primary, fontSize: 13, fontWeight: '700' },
 });

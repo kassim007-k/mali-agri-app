@@ -7,6 +7,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { getCourseCatalog } from '@/features/data/learning';
 import type { CourseCatalogItem } from '@/features/data/database.types';
 import { useLiveQuery } from '@/features/data/use-live-query';
+import { supabase } from '@/lib/supabase';
 
 const courseTables = ['agri_courses', 'agri_lessons'] as const;
 const emptyCatalog: CourseCatalogItem[] = [];
@@ -150,9 +151,22 @@ export default function FormationsScreen() {
 
 function CourseCard({ item }: { item: CourseCatalogItem }) {
   const { course, lessonCount } = item;
+  const openCourse = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        router.push({ pathname: '/(tabs)/formations/[courseId]', params: { courseId: course.id } });
+        return;
+      }
+    } catch {
+      // En cas de session illisible, demander une authentification reste le choix sûr.
+    }
+    router.push({ pathname: '/login', params: { courseId: course.id } });
+  };
+
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/(tabs)/formations/[courseId]', params: { courseId: course.id } })}
+      onPress={() => void openCourse()}
       style={({ pressed }) => [styles.courseCard, pressed && styles.pressed]}
       accessibilityRole="button"
       accessibilityLabel={`Voir la formation ${course.title}`}

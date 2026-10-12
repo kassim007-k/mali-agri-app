@@ -13,29 +13,34 @@ const homeTables: AgriTableName[] = ['agri_courses', 'agri_lessons', 'agri_enrol
 const noTables: AgriTableName[] = [];
 
 export default function HomeScreen() {
-  // On force un ID de test pour ne plus être bloqué par l'auth
-  const [userId, setUserId] = useState<string | null>('00000000-0000-0000-0000-000000000000');
-  const [userName, setUserName] = useState('Abdoul Wahab');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState('');
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     let active = true;
-    const loadSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (active && session?.user) {
-        setUserId(session.user.id);
-        setUserName(session.user.user_metadata?.full_name ?? 'Agriculteur');
-      }
+    const applySession = (session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']) => {
+      if (!active) return;
+      const user = session?.user;
+      const fullName = user?.user_metadata?.full_name;
+      setUserId(user?.id ?? null);
+      setUserName(typeof fullName === 'string' ? fullName.trim() : '');
+      setAuthReady(true);
     };
-    loadSession();
-    // On ne met plus de listener qui pourrait remettre userId à null
-    return () => { active = false; };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => applySession(session));
+    void supabase.auth.getSession().then(({ data: { session } }) => applySession(session)).catch(() => applySession(null));
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadLearning = useCallback(
-    () => getMyLearning(userId || '00000000-0000-0000-0000-000000000000'),
+    () => userId ? getMyLearning(userId) : Promise.resolve([] as CourseProgress[]),
     [userId],
   );
-  const tables = homeTables;
+  const tables = userId ? homeTables : noTables;
   const { data, loading, refreshing, error, refresh } = useLiveQuery(`home-${userId}`, tables, loadLearning);
   const learning = data ?? [];
   const averageProgress = learning.length
@@ -50,20 +55,24 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor="#FFFFFF" />}
       >
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>MALI AGRI · VOTRE ESPACE</Text>
-          <Text style={styles.title}>{userName ? `Bonjour, ${userName}` : 'Votre progression'}</Text>
-          <Text style={styles.subtitle}>Reprenez vos cours là où vous en étiez.</Text>
-          <View style={styles.statsRow}>
-            <Stat value={`${learning.length}`} label="formations suivies" />
-            <View style={styles.divider} />
-            <Stat value={`${averageProgress}%`} label="progression moyenne" />
-          </View>
+          <Text style={styles.eyebrow}>{userId ? 'MALI AGRI · VOTRE ESPACE' : 'MALI AGRI · APPRENDRE'}</Text>
+          <Text style={styles.title}>{userId ? (userName ? `Bonjour, ${userName}` : 'Votre progression') : 'Bienvenue sur Mali Agri'}</Text>
+          <Text style={styles.subtitle}>
+            {userId ? 'Reprenez vos cours là où vous en étiez.' : 'Parcourez librement les formations. Un compte sera demandé pour ouvrir un cours.'}
+          </Text>
+          {userId ? (
+            <View style={styles.statsRow}>
+              <Stat value={`${learning.length}`} label="formations suivies" />
+              <View style={styles.divider} />
+              <Stat value={`${averageProgress}%`} label="progression moyenne" />
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.sectionHeading}>
           <View>
-            <Text style={styles.sectionKicker}>VOTRE APPRENTISSAGE</Text>
-            <Text style={styles.sectionTitle}>Mes formations</Text>
+            <Text style={styles.sectionKicker}>{userId ? 'VOTRE APPRENTISSAGE' : 'À DÉCOUVRIR'}</Text>
+            <Text style={styles.sectionTitle}>{userId ? 'Mes formations' : 'Catalogue des cours'}</Text>
           </View>
           <Pressable onPress={() => router.push('/(tabs)/formations')} style={styles.browseButton}>
             <Text style={styles.browseText}>Explorer</Text>
@@ -71,7 +80,23 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {loading ? (
+        {!authReady ? (
+          <View style={styles.emptyCard}><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Vérification de votre compte…</Text></View>
+        ) : !userId ? (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIcon}>
+              <SymbolView name={{ ios: 'book.closed.fill', android: 'menu_book', web: 'menu_book' } as any} size={27} tintColor={Colors.light.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>Explorez les formations</Text>
+            <Text style={styles.emptyDescription}>Consultez les cours d’agriculture et d’élevage. Connectez-vous pour suivre une formation.</Text>
+            <Pressable onPress={() => router.push('/(tabs)/formations')} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Voir les formations</Text>
+            </Pressable>
+            <Pressable onPress={() => router.push('/login')} style={styles.guestAuthButton}>
+              <Text style={styles.guestAuthText}>Se connecter ou créer un compte</Text>
+            </Pressable>
+          </View>
+        ) : loading ? (
           <View style={styles.emptyCard}><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Chargement de votre progression…</Text></View>
         ) : error ? (
           <View style={styles.emptyCard}>
@@ -94,10 +119,12 @@ export default function HomeScreen() {
           learning.map((item) => <LearningCard key={item.course.id} item={item} />)
         )}
 
-        <View style={styles.liveNote}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>Le suivi se met à jour automatiquement.</Text>
-        </View>
+        {userId ? (
+          <View style={styles.liveNote}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>Le suivi se met à jour automatiquement.</Text>
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -155,6 +182,8 @@ const styles = StyleSheet.create({
   muted: { color: '#69766E', fontSize: 12, lineHeight: 18 },
   primaryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.light.accent, paddingHorizontal: Spacing.four, borderRadius: 11, marginTop: Spacing.one },
   primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  guestAuthButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.two, marginTop: 2 },
+  guestAuthText: { color: Colors.light.primary, fontSize: 12, fontWeight: '800' },
   courseCard: { backgroundColor: '#FFFFFF', borderRadius: 17, padding: Spacing.three, marginHorizontal: Spacing.four, marginBottom: Spacing.three, borderWidth: 1, borderColor: '#E8EEE9', shadowColor: '#143322', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   pressed: { opacity: 0.84 },
   courseTop: { flexDirection: 'row', alignItems: 'center' },

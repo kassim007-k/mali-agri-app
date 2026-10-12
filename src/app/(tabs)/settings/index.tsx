@@ -13,31 +13,21 @@ const profileTable: AgriTableName[] = ['agri_profiles'];
 const noTables: AgriTableName[] = [];
 
 export default function SettingsScreen() {
-  const [userId, setUserId] = useState<string | null>('00000000-0000-0000-0000-000000000000');
-  const [email, setEmail] = useState('dev@afri-farm.com');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
   const [authReady, setAuthReady] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     let active = true;
-    const loadSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (active && session?.user) {
-        setUserId(session.user.id);
-        setEmail(session.user.email ?? '');
-      }
-      if (active) setAuthReady(true);
+    const applySession = (session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']) => {
+      if (!active) return;
+      setUserId(session?.user.id ?? null);
+      setEmail(session?.user.email ?? '');
+      setAuthReady(true);
     };
-    loadSession();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUserId(session.user.id);
-        setEmail(session.user.email ?? '');
-      } else {
-        setUserId('00000000-0000-0000-0000-000000000000');
-        setEmail('dev@afri-farm.com');
-      }
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => applySession(session));
+    void supabase.auth.getSession().then(({ data: { session } }) => applySession(session)).catch(() => applySession(null));
     return () => {
       active = false;
       subscription.unsubscribe();
@@ -72,60 +62,59 @@ export default function SettingsScreen() {
           <View style={styles.stateCard}><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Vérification de votre compte…</Text></View>
         ) : (
           <>
-            {userId === '00000000-0000-0000-0000-000000000000' && (
-              <View style={styles.devBanner}>
-                <SymbolView name={{ ios: 'hammer.fill', android: 'build', web: 'build' } as any} size={14} tintColor="#856404" />
-                <Text style={styles.devBannerText}>Mode Développement : Session simulée active.</Text>
-              </View>
-            )}
-            <View style={styles.profileCard}>
-              <View style={styles.avatar}>
-                <SymbolView name={{ ios: 'person.fill', android: 'person', web: 'person' } as any} size={26} tintColor="#FFFFFF" />
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>{profile?.full_name || (userId === '00000000-0000-0000-0000-000000000000' ? 'Développeur' : 'Votre profil')}</Text>
-                <Text style={styles.muted}>{userId === '00000000-0000-0000-0000-000000000000' ? 'Accès invité (ID de test)' : (email || 'Compte connecté')}</Text>
-              </View>
-              {profile ? <Text style={[styles.roleBadge, profile.role === 'admin' && styles.adminBadge]}>{profile.role === 'admin' ? 'ADMIN' : 'MEMBRE'}</Text> : null}
-            </View>
+            {userId ? (
+              <>
+                <View style={styles.profileCard}>
+                  <View style={styles.avatar}>
+                    <SymbolView name={{ ios: 'person.fill', android: 'person', web: 'person' } as any} size={26} tintColor="#FFFFFF" />
+                  </View>
+                  <View style={styles.profileInfo}>
+                    <Text style={styles.profileName}>{profile?.full_name || 'Votre profil'}</Text>
+                    <Text style={styles.muted}>{email || 'Compte connecté'}</Text>
+                  </View>
+                  {profile ? <Text style={[styles.roleBadge, profile.role === 'admin' && styles.adminBadge]}>{profile.role === 'admin' ? 'ADMIN' : 'MEMBRE'}</Text> : null}
+                </View>
 
-            {loading && !profile ? (
-              <View style={styles.stateCard}><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Chargement du profil…</Text></View>
-            ) : error ? (
-              <View style={styles.stateCard}>
-                <Text style={styles.rowTitle}>Profil indisponible</Text>
-                <Text style={styles.muted}>{error}</Text>
-                <Pressable onPress={() => void refresh()}><Text style={styles.actionText}>Réessayer</Text></Pressable>
-              </View>
-            ) : null}
+                {loading && !profile ? (
+                  <View style={styles.stateCard}><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Chargement du profil…</Text></View>
+                ) : error ? (
+                  <View style={styles.stateCard}>
+                    <Text style={styles.rowTitle}>Profil indisponible</Text>
+                    <Text style={styles.muted}>{error}</Text>
+                    <Pressable onPress={() => void refresh()}><Text style={styles.actionText}>Réessayer</Text></Pressable>
+                  </View>
+                ) : null}
 
-            <SettingsRow
-              icon={{ ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' }}
-              title="Modifier mon profil"
-              subtitle="Nom affiché et informations du compte"
-              onPress={() => router.push('/(tabs)/settings/profile')}
-            />
-            {profile?.role === 'admin' ? (
-              <SettingsRow
-                icon={{ ios: 'chart.bar.xaxis', android: 'admin_panel_settings', web: 'admin_panel_settings' }}
-                title="Espace administration"
-                subtitle="Cours, membres et suivi des inscriptions"
-                onPress={() => router.push('/(tabs)/settings/admin')}
-              />
-            ) : null}
+                <SettingsRow
+                  icon={{ ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' }}
+                  title="Modifier mon profil"
+                  subtitle="Nom affiché et informations du compte"
+                  onPress={() => router.push('/(tabs)/settings/profile')}
+                />
+                {profile?.role === 'admin' ? (
+                  <SettingsRow
+                    icon={{ ios: 'chart.bar.xaxis', android: 'admin_panel_settings', web: 'admin_panel_settings' }}
+                    title="Espace administration"
+                    subtitle="Cours, membres et suivi des inscriptions"
+                    onPress={() => router.push('/(tabs)/settings/admin')}
+                  />
+                ) : null}
 
-            {userId !== '00000000-0000-0000-0000-000000000000' ? (
               <Pressable onPress={() => void handleSignOut()} disabled={signingOut} style={[styles.signOutButton, signingOut && styles.disabled]}>
                 <SymbolView name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any} size={19} tintColor="#A34337" />
                 <Text style={styles.signOutText}>{signingOut ? 'Déconnexion…' : 'Se déconnecter'}</Text>
               </Pressable>
+              </>
             ) : (
               <View style={styles.stateCard}>
-                <Text style={styles.rowTitle}>Passer au mode réel</Text>
-                <Text style={styles.muted}>Pour tester l'authentification par email et les restrictions de sécurité.</Text>
+                <View style={styles.guestIcon}>
+                  <SymbolView name={{ ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' } as any} size={28} tintColor={Colors.light.primary} />
+                </View>
+                <Text style={styles.rowTitle}>Votre espace personnel</Text>
+                <Text style={styles.muted}>Créez un compte pour suivre vos formations et retrouver votre progression.</Text>
                 <View style={styles.authButtonsRow}>
                   <Pressable onPress={() => router.push('/login')} style={styles.authButton}><Text style={styles.authButtonText}>Connexion</Text></Pressable>
-                  <Pressable onPress={() => router.push('/register')} style={styles.authButton}><Text style={styles.authButtonText}>S'inscrire</Text></Pressable>
+                  <Pressable onPress={() => router.push('/register')} style={styles.authButton}><Text style={styles.authButtonText}>S’inscrire</Text></Pressable>
                 </View>
               </View>
             )}
@@ -167,8 +156,6 @@ const styles = StyleSheet.create({
   rowIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#EAF2EC', alignItems: 'center', justifyContent: 'center' },
   rowContent: { flex: 1, marginHorizontal: Spacing.two },
   rowTitle: { color: '#26332C', fontSize: 14, fontWeight: '800', marginBottom: 3 },
-  devBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF3CD', borderBottomWidth: 1, borderColor: '#FFEEBA', paddingHorizontal: Spacing.four, paddingVertical: 10 },
-  devBannerText: { color: '#856404', fontSize: 12, fontWeight: '600' },
   signOutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: Spacing.four, marginTop: Spacing.two, padding: 14, borderRadius: 13, backgroundColor: '#FBEDEA' },
   signOutText: { color: '#A34337', fontSize: 13, fontWeight: '800' },
   disabled: { opacity: 0.6 },
@@ -177,9 +164,6 @@ const styles = StyleSheet.create({
   authButton: { backgroundColor: Colors.light.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   authButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   guestIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF2EC' },
-  primaryButton: { backgroundColor: Colors.light.primary, alignItems: 'center', minWidth: 160, paddingHorizontal: Spacing.four, paddingVertical: 13, borderRadius: 11, marginTop: Spacing.one },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-  registerButton: { padding: 7 },
   actionText: { color: Colors.light.primary, fontSize: 13, fontWeight: '800' },
   version: { color: '#8B968F', fontSize: 11, textAlign: 'center', marginTop: Spacing.three },
 });

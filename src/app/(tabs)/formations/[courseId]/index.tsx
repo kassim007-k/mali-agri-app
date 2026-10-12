@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -28,15 +28,13 @@ export default function CourseDetailScreen() {
   const [courseLanguage, setCourseLanguage] = useState<'fr' | 'bm'>('fr');
   const [editingCourse, setEditingCourse] = useState(false);
   const loadPage = useCallback(async (): Promise<CoursePageData> => {
-    const [{ data: { session } }, course, lessons] = await Promise.all([
-      supabase.auth.getSession(),
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user.id ?? null;
+    if (!userId) return { course: null, lessons: [], enrollment: null, isAdmin: false, userId: null };
+
+    const [course, lessons, enrollment, profile] = await Promise.all([
       getCourse(courseId),
       getLessons(courseId),
-    ]);
-    const userId = session?.user.id ?? null;
-    if (!userId) return { course, lessons, enrollment: null, isAdmin: false, userId: null };
-
-    const [enrollment, profile] = await Promise.all([
       getMyEnrollment(userId, courseId),
       getMyProfile(userId),
     ]);
@@ -45,9 +43,15 @@ export default function CourseDetailScreen() {
 
   const { data, loading, refreshing, error, refresh } = useLiveQuery(`course-${courseId}`, courseTables, loadPage);
 
+  useEffect(() => {
+    if (!loading && data && !data.userId) {
+      router.replace({ pathname: '/login', params: { courseId } });
+    }
+  }, [courseId, data, loading]);
+
   const handleEnroll = async () => {
     if (!data?.userId) {
-      router.push('/login');
+      router.push({ pathname: '/login', params: { courseId } });
       return;
     }
     setActionLoading(true);
@@ -156,6 +160,10 @@ export default function CourseDetailScreen() {
 
   if (loading) {
     return <CenteredState><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Chargement du cours…</Text></CenteredState>;
+  }
+
+  if (data && !data.userId) {
+    return <CenteredState><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Redirection vers la connexion…</Text></CenteredState>;
   }
 
   if (error || !data?.course) {

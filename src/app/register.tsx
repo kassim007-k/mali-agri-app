@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { SymbolView } from 'expo-symbols';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 export default function RegisterScreen() {
+  const { courseId } = useLocalSearchParams<{ courseId?: string | string[] }>();
+  const requestedCourseId = Array.isArray(courseId) ? courseId[0] : courseId;
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,10 +41,14 @@ export default function RegisterScreen() {
         Alert.alert('Erreur d’inscription', error.message);
       } else if (data.session) {
         Alert.alert('Compte créé', 'Votre compte est prêt.');
-        router.replace('/(tabs)/home');
+        if (requestedCourseId) {
+          router.replace({ pathname: '/(tabs)/formations/[courseId]', params: { courseId: requestedCourseId } });
+        } else {
+          router.replace('/(tabs)/home');
+        }
       } else {
         Alert.alert('Vérifiez vos emails', 'Un lien de confirmation vous a été envoyé.');
-        router.replace('/login');
+        router.replace(requestedCourseId ? { pathname: '/login', params: { courseId: requestedCourseId } } : '/login');
       }
     } catch {
       Alert.alert('Erreur d’inscription', 'Vérifiez votre connexion puis réessayez.');
@@ -65,7 +71,7 @@ export default function RegisterScreen() {
         <Text style={styles.label}>Nom complet</Text>
         <TextInput
           style={styles.input}
-          placeholder="Abdoul Wahab"
+          placeholder="Votre nom complet"
           value={fullName}
           onChangeText={setFullName}
           editable={!loading}

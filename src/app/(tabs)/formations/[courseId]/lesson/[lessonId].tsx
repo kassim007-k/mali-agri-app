@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -17,10 +17,13 @@ export default function LessonScreen() {
   const { courseId, lessonId } = useLocalSearchParams<{ courseId: string; lessonId: string }>();
   const [saving, setSaving] = useState(false);
   const loadLesson = useCallback(async (): Promise<LessonPageData> => {
-    const [{ data: { session } }, lesson] = await Promise.all([supabase.auth.getSession(), getLesson(lessonId)]);
-    const course = lesson ? await getCourse(lesson.course_id) : await getCourse(courseId);
+    const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user.id ?? null;
-    if (!userId || !lesson) return { lesson, course, enrollment: null, completed: false, isAdmin: false, userId };
+    if (!userId) return { lesson: null, course: null, enrollment: null, completed: false, isAdmin: false, userId: null };
+
+    const lesson = await getLesson(lessonId);
+    const course = lesson ? await getCourse(lesson.course_id) : await getCourse(courseId);
+    if (!lesson) return { lesson, course, enrollment: null, completed: false, isAdmin: false, userId };
 
     const [enrollment, profile, completed] = await Promise.all([
       getMyEnrollment(userId, lesson.course_id),
@@ -31,6 +34,12 @@ export default function LessonScreen() {
   }, [courseId, lessonId]);
 
   const { data, loading, refreshing, error, refresh } = useLiveQuery(`lesson-${lessonId}`, lessonTables, loadLesson);
+
+  useEffect(() => {
+    if (!loading && data && !data.userId) {
+      router.replace({ pathname: '/login', params: { courseId } });
+    }
+  }, [courseId, data, loading]);
 
   const handleComplete = async () => {
     if (!data?.userId || !data.lesson) return;
@@ -58,6 +67,7 @@ export default function LessonScreen() {
   };
 
   if (loading) return <CenteredState><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Ouverture de la leçon…</Text></CenteredState>;
+  if (data && !data.userId) return <CenteredState><ActivityIndicator color={Colors.light.primary} /><Text style={styles.muted}>Redirection vers la connexion…</Text></CenteredState>;
   if (error || !data?.lesson) {
     return (
       <CenteredState>
