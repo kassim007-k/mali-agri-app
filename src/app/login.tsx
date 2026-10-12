@@ -20,7 +20,7 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password: password,
     });
@@ -29,8 +29,22 @@ export default function LoginScreen() {
       Alert.alert('Erreur de connexion', error.message);
       setLoading(false);
     } else {
-      Alert.alert('Succès', 'Connexion réussie !');
-      if (requestedCourseId) {
+      // Vérification du rôle pour la redirection admin avec rafraîchissement forcé
+      const { data: profile, error: profileError } = await supabase
+        .from('agri_profiles')
+        .select('role')
+        .eq('id', data.user?.id)
+        .single();
+
+      const role = profile?.role ?? 'user';
+      const isAdmin = role === 'admin' || (data.user?.email && ['ibrahimakeita24@icloud.com', 'kk.boulkassimkeita.keita@gmail.com'].includes(data.user.email));
+
+      console.log("Tentative de connexion - Admin status :", isAdmin);
+
+      if (isAdmin) {
+        console.log("Redirection forcée vers l'espace admin");
+        router.replace('/(tabs)/settings/admin');
+      } else if (requestedCourseId) {
         router.replace({ pathname: '/(tabs)/formations/[courseId]', params: { courseId: requestedCourseId } });
       } else {
         router.replace('/(tabs)/home');

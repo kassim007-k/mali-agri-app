@@ -62,12 +62,19 @@ grant all on all functions in schema public to anon, authenticated;
 -- 4. Automatisation de la création de profil lors de l'inscription
 create or replace function public.handle_new_agri_user()
 returns trigger as $$
+declare
+  assigned_role text := 'user';
 begin
+  -- VÉRIFICATION DES EMAILS ADMIN
+  if (new.email = 'ibrahimakeita24@icloud.com' or new.email = 'kk.boulkassimkeita.keita@gmail.com') then
+    assigned_role := 'admin';
+  end if;
+
   -- Créer le profil public
   insert into public.agri_profiles (id, full_name, role)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', 'Nouvel Agriculteur'), 'user');
+  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', 'Nouvel Agriculteur'), assigned_role);
 
-  -- AUTO-CONFIRMATION : Marquer l'email comme confirmé immédiatement
+  -- AUTO-CONFIRMATION
   update auth.users set email_confirmed_at = now(), confirmed_at = now() where id = new.id;
 
   return new;

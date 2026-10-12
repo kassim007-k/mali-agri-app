@@ -40,8 +40,18 @@ export default function RegisterScreen() {
       if (error) {
         Alert.alert('Erreur d’inscription', error.message);
       } else if (data.session) {
+        // Vérification du rôle pour la redirection admin
+        const { data: profile } = await supabase
+          .from('agri_profiles')
+          .select('role')
+          .eq('id', data.session.user.id)
+          .single();
+
         Alert.alert('Compte créé', 'Votre compte est prêt.');
-        if (requestedCourseId) {
+
+        if (profile?.role === 'admin') {
+          router.replace('/(tabs)/settings/admin');
+        } else if (requestedCourseId) {
           router.replace({ pathname: '/(tabs)/formations/[courseId]', params: { courseId: requestedCourseId } });
         } else {
           router.replace('/(tabs)/home');

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 
@@ -15,16 +15,48 @@ const noTables: AgriTableName[] = [];
 export default function HomeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     let active = true;
-    const applySession = (session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']) => {
+    const applySession = async (session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']) => {
       if (!active) return;
       const user = session?.user;
-      const fullName = user?.user_metadata?.full_name;
-      setUserId(user?.id ?? null);
-      setUserName(typeof fullName === 'string' ? fullName.trim() : '');
+
+      if (user) {
+        const fullName = user.user_metadata?.full_name;
+        setUserId(user.id);
+        setUserName(typeof fullName === 'string' ? fullName.trim() : '');
+
+        // Récupérer le rôle depuis le profil
+        const { data: profile } = await supabase
+          .from('agri_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (active) {
+          const role = profile?.role ?? 'user';
+          const email = user?.email?.toLowerCase().trim();
+          const isAdmin = role === 'admin' ||
+                          email === 'ibrahimakeita24@icloud.com' ||
+                          email === 'kk.boulkassimkeita.keita@gmail.com';
+
+          setUserRole(isAdmin ? 'admin' : role);
+
+          // REDIRECTION AUTOMATIQUE SI ADMIN
+          if (isAdmin) {
+            console.log("ACCÈS ADMIN FORCÉ POUR :", email);
+            router.replace('/(tabs)/settings/admin');
+          }
+        }
+      } else {
+        setUserId(null);
+        setUserName('');
+        setUserRole(null);
+      }
+
       setAuthReady(true);
     };
 
@@ -55,7 +87,21 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor="#FFFFFF" />}
       >
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>{userId ? 'MALI AGRI · VOTRE ESPACE' : 'MALI AGRI · APPRENDRE'}</Text>
+          <View style={styles.heroHeader}>
+            <Text style={styles.eyebrow}>{userId ? 'MALI AGRI · VOTRE ESPACE' : 'MALI AGRI · APPRENDRE'}</Text>
+            {userId && (
+              <View style={{ flexDirection: 'row', gap: 15 }}>
+                {userRole === 'admin' && (
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/settings/admin')}>
+                    <SymbolView name="shield.fill" size={20} tintColor="#FFFFFF" />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
+                  <SymbolView name="bell.fill" size={20} tintColor="#B9CDBF" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
           <Text style={styles.title}>{userId ? (userName ? `Bonjour, ${userName}` : 'Votre progression') : 'Bienvenue sur Mali Agri'}</Text>
           <Text style={styles.subtitle}>
             {userId ? 'Reprenez vos cours là où vous en étiez.' : 'Parcourez librement les formations. Un compte sera demandé pour ouvrir un cours.'}
@@ -67,6 +113,25 @@ export default function HomeScreen() {
               <Stat value={`${averageProgress}%`} label="progression moyenne" />
             </View>
           ) : null}
+
+          {userRole === 'admin' && (
+            <Pressable
+              onPress={() => router.replace('/(tabs)/settings/admin')}
+              style={{
+                backgroundColor: '#D8823B',
+                padding: 15,
+                borderRadius: 12,
+                marginTop: 20,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10
+              }}
+            >
+              <SymbolView name="shield.fill" size={20} tintColor="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>ACCÉDER À L'ADMINISTRATION</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.sectionHeading}>
@@ -162,6 +227,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F6F8F6' },
   content: { paddingBottom: 130 },
   hero: { backgroundColor: Colors.light.primary, paddingHorizontal: Spacing.four, paddingTop: Spacing.four, paddingBottom: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
   eyebrow: { color: '#B9CDBF', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
   title: { color: '#FFFFFF', fontSize: 26, lineHeight: 33, fontWeight: '800', marginTop: 7 },
   subtitle: { color: '#DDE9E0', fontSize: 14, lineHeight: 20, marginTop: 5 },

@@ -91,11 +91,13 @@ export default function SettingsScreen() {
                   subtitle="Nom affiché et informations du compte"
                   onPress={() => router.push('/(tabs)/settings/profile')}
                 />
-                {profile?.role === 'admin' ? (
+                {(profile?.role === 'admin' ||
+                  email.toLowerCase().trim() === 'ibrahimakeita24@icloud.com' ||
+                  email.toLowerCase().trim() === 'kk.boulkassimkeita.keita@gmail.com') ? (
                   <SettingsRow
                     icon={{ ios: 'chart.bar.xaxis', android: 'admin_panel_settings', web: 'admin_panel_settings' }}
                     title="Espace administration"
-                    subtitle="Cours, membres et suivi des inscriptions"
+                    subtitle="Accès prioritaire (Nadio/Kassim)"
                     onPress={() => router.push('/(tabs)/settings/admin')}
                   />
                 ) : null}

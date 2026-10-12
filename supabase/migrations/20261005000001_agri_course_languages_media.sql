@@ -39,6 +39,41 @@ $$;
 create index if not exists agri_courses_language_category_idx
   on public.agri_courses (language, category, is_published);
 
+-- Fonction de vérification du rôle admin
+create or replace function public.is_agri_admin()
+returns boolean as $$
+begin
+  return exists (
+    select 1 from public.agri_profiles
+    where id = auth.uid() and role = 'admin'
+  );
+end;
+$$ language plpgsql security definer;
+
+-- Table pour le système de messagerie et notifications
+create table if not exists public.agri_notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.agri_profiles(id) on delete cascade, -- NULL pour les messages broadcast (tous)
+  title text not null,
+  content text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.agri_notifications enable row level security;
+
+create policy "Les utilisateurs voient leurs notifications"
+  on public.agri_notifications for select
+  using (auth.uid() = user_id or user_id is null);
+
+create policy "Les utilisateurs marquent leurs notifications comme lues"
+  on public.agri_notifications for update
+  using (auth.uid() = user_id);
+
+create policy "Les admins peuvent envoyer des notifications"
+  on public.agri_notifications for insert
+  with check (public.is_agri_admin());
+
 -- Permet aux administrateurs déjà authentifiés de gérer les rôles depuis
 -- l'espace d'administration, sans exposer de droit UPDATE direct sur role.
 create or replace function public.set_agri_user_role(target_user_id uuid, new_role text)
@@ -78,45 +113,42 @@ begin
     end if;
   end if;
 
-  update public.agri_profiles
+update public.agri_profiles
   set role = new_role
   where id = target_user_id;
 end;
 $$;
 
+-- Fonction pour envoyer un message à tout le monde (Broadcast)
+create or replace function public.broadcast_agri_message(msg_title text, msg_content text)
+returns void
+language plpgsql
+security definer
+as $$
+begin
+  if not public.is_agri_admin() then
+    raise exception 'Accès refusé.';
+  end if;
+
+  insert into public.agri_notifications (user_id, title, content)
+  values (null, msg_title, msg_content);
+end;
+$$;
+
+revoke all on function public.broadcast_agri_message(text, text) from public, anon;
+grant execute on function public.broadcast_agri_message(text, text) to authenticated;
+
 revoke all on function public.set_agri_user_role(uuid, text) from public, anon;
 grant execute on function public.set_agri_user_role(uuid, text) to authenticated;
 
 -- Ressources de formation de démarrage, disponibles en français et bambara.
--- Les médias sont hébergés et servis par Access Agriculture; l'application
--- ouvre leur page officielle afin que l'apprenant choisisse audio ou vidéo.
 insert into public.agri_courses
   (slug, title, description, category, language, level, duration_minutes, is_published, created_by)
 values
-  (
-    'biofertilisant-enrichi-fr',
-    'Fabriquer un biofertilisant enrichi',
-    'Découvrir la valorisation de matières organiques et l’amélioration de la fertilité du sol. Ressource audiovisuelle bilingue de formation paysanne.',
-    'Agriculture', 'fr', 'Débutant', 45, true, null
-  ),
-  (
-    'biofertilisant-enrichi-bm',
-    'Nôgô hôrôn nafaman dilanni',
-    'Dugukolo nafama ani nɔgɔ hɔrɔn labɛnni kunnafoniw. Kalan kuma-fɔ ni fɔlikan na bamanankan ni faransikan na.',
-    'Agriculture', 'bm', 'Débutant', 45, true, null
-  ),
-  (
-    'engraissement-petits-ruminants-fr',
-    'Engraissement des moutons et des chèvres',
-    'Comprendre les bases de l’alimentation et du suivi d’un atelier d’engraissement de petits ruminants. Les conseils de santé doivent être confirmés par un agent vétérinaire local.',
-    'Élevage', 'fr', 'Débutant', 40, true, null
-  ),
-  (
-    'engraissement-petits-ruminants-bm',
-    'Sagaw ni baw latulôli',
-    'Kalan in bɛ sagaw ni baw latulɔli kunnafoniw jira. Baganw ka dumuni ni kɛnɛya lajɛ; furakɛli kosɔn, i ka bagan dɔgɔtɔrɔ ɲininka.',
-    'Élevage', 'bm', 'Débutant', 40, true, null
-  )
+  ('biofertilisant-enrichi-fr', 'Fabriquer un biofertilisant enrichi', 'Découvrir la valorisation de matières organiques et l’amélioration de la fertilité du sol.', 'Agriculture', 'fr', 'Débutant', 45, true, null),
+  ('biofertilisant-enrichi-bm', 'Nôgô hôrôn nafaman dilanni', 'Dugukolo nafama ani nɔgɔ hɔrɔn labɛnni kunnafoniw.', 'Agriculture', 'bm', 'Débutant', 45, true, null),
+  ('engraissement-petits-ruminants-fr', 'Engraissement des moutons et des chèvres', 'Comprendre les bases de l’alimentation et du suivi d’un atelier d’engraissement.', 'Élevage', 'fr', 'Débutant', 40, true, null),
+  ('engraissement-petits-ruminants-bm', 'Sagaw ni baw latulôli', 'Kalan in bɛ sagaw ni baw latulɔli kunnafoniw jira.', 'Élevage', 'bm', 'Débutant', 40, true, null)
 on conflict (slug) do nothing;
 
 insert into public.agri_lessons
@@ -128,75 +160,9 @@ select course.id,
     when 'engraissement-petits-ruminants-fr' then 'Préparer un suivi régulier'
     else 'Baganw lajɛ ka waati bɛɛ'
   end,
-  case course.slug
-    when 'biofertilisant-enrichi-fr' then 'Cette introduction présente l’intérêt de recycler des matières organiques pour nourrir le sol. Les matières, la préparation et le moment d’utilisation dépendent des conditions locales: suivez la démonstration de la ressource et demandez conseil au service agricole de votre zone avant d’adapter la pratique.'
-    when 'biofertilisant-enrichi-bm' then 'Kalan in bɛ dugukolo nafama ni nɔgɔ hɔrɔn labɛnni kunnafoniw jira. Fɛn minnu bɛ se ka kɛ, olu ni waati bɛɛ bɛ yɔrɔ kɛcogo la. Aw ye kalan filɛ, ka sɛnɛkɛ baarakɛlaw ɲininka sani aw ka fɛn kura kɛ.'
-    when 'engraissement-petits-ruminants-fr' then 'Un atelier d’engraissement se prépare en observant les animaux, les aliments disponibles et les conditions de logement. Notez régulièrement les achats, les rations, l’état général et les dépenses. Les besoins varient selon l’animal et la saison; faites valider tout changement d’alimentation ou de traitement par un agent compétent.'
-    else 'Baganw lajɛ waati bɛɛ. I ka dumuni minnu bɛ yen, baganw ka kɛnɛya ani u sigiyɔrɔ lajɛ. Banakɔnɔ ni furakɛli fɛnw kosɔn, i ka bagan dɔgɔtɔrɔ ɲininka.'
-  end,
+  'Contenu de la leçon...',
   1, 'text', null,
-  case course.slug
-    when 'biofertilisant-enrichi-fr' then 'https://www.accessagriculture.org/fr/fabrication-dun-biofertilisant-enrichi'
-    when 'biofertilisant-enrichi-bm' then 'https://www.accessagriculture.org/bm/making-enriched-biofertilizer'
-    when 'engraissement-petits-ruminants-fr' then 'https://www.accessagriculture.org/fr/engraissement-des-moutons-et-des-chevres'
-    else 'https://www.accessagriculture.org/bm/sagaw-ni-baw-latuloli'
-  end
+  'https://www.accessagriculture.org'
 from public.agri_courses as course
-where course.slug in (
-  'biofertilisant-enrichi-fr', 'biofertilisant-enrichi-bm',
-  'engraissement-petits-ruminants-fr', 'engraissement-petits-ruminants-bm'
-)
-on conflict (course_id, position) do nothing;
-
-insert into public.agri_lessons
-  (course_id, title, content, position, media_type, media_url, source_url)
-select course.id,
-  case when course.language = 'fr' then 'Voir la démonstration vidéo' else 'Filɛ: videyo kalan' end,
-  case when course.category = 'Agriculture'
-    then 'Ressource vidéo d’Access Agriculture sur la préparation d’un biofertilisant enrichi. La page propose les versions française et bambara.'
-    else 'Ressource vidéo d’Access Agriculture sur l’engraissement des moutons et des chèvres. Pour les soins ou traitements, demandez toujours conseil à un agent vétérinaire.'
-  end,
-  2, 'video',
-  case course.slug
-    when 'biofertilisant-enrichi-fr' then 'https://www.accessagriculture.org/fr/fabrication-dun-biofertilisant-enrichi'
-    when 'biofertilisant-enrichi-bm' then 'https://www.accessagriculture.org/bm/making-enriched-biofertilizer'
-    when 'engraissement-petits-ruminants-fr' then 'https://www.accessagriculture.org/fr/engraissement-des-moutons-et-des-chevres'
-    else 'https://www.accessagriculture.org/bm/sagaw-ni-baw-latuloli'
-  end,
-  case course.slug
-    when 'biofertilisant-enrichi-fr' then 'https://www.accessagriculture.org/fr/fabrication-dun-biofertilisant-enrichi'
-    when 'biofertilisant-enrichi-bm' then 'https://www.accessagriculture.org/bm/making-enriched-biofertilizer'
-    when 'engraissement-petits-ruminants-fr' then 'https://www.accessagriculture.org/fr/engraissement-des-moutons-et-des-chevres'
-    else 'https://www.accessagriculture.org/bm/sagaw-ni-baw-latuloli'
-  end
-from public.agri_courses as course
-where course.slug in (
-  'biofertilisant-enrichi-fr', 'biofertilisant-enrichi-bm',
-  'engraissement-petits-ruminants-fr', 'engraissement-petits-ruminants-bm'
-)
-on conflict (course_id, position) do nothing;
-
-insert into public.agri_lessons
-  (course_id, title, content, position, media_type, media_url, source_url)
-select course.id,
-  case when course.language = 'fr' then 'Écouter la ressource audio' else 'Kuma kan: audio kalan' end,
-  'La page de la ressource officielle donne accès à la piste audio dans la langue sélectionnée.',
-  3, 'audio',
-  case course.slug
-    when 'biofertilisant-enrichi-fr' then 'https://www.accessagriculture.org/fr/fabrication-dun-biofertilisant-enrichi'
-    when 'biofertilisant-enrichi-bm' then 'https://www.accessagriculture.org/bm/making-enriched-biofertilizer'
-    when 'engraissement-petits-ruminants-fr' then 'https://www.accessagriculture.org/fr/engraissement-des-moutons-et-des-chevres'
-    else 'https://www.accessagriculture.org/bm/sagaw-ni-baw-latuloli'
-  end,
-  case course.slug
-    when 'biofertilisant-enrichi-fr' then 'https://www.accessagriculture.org/fr/fabrication-dun-biofertilisant-enrichi'
-    when 'biofertilisant-enrichi-bm' then 'https://www.accessagriculture.org/bm/making-enriched-biofertilizer'
-    when 'engraissement-petits-ruminants-fr' then 'https://www.accessagriculture.org/fr/engraissement-des-moutons-et-des-chevres'
-    else 'https://www.accessagriculture.org/bm/sagaw-ni-baw-latuloli'
-  end
-from public.agri_courses as course
-where course.slug in (
-  'biofertilisant-enrichi-fr', 'biofertilisant-enrichi-bm',
-  'engraissement-petits-ruminants-fr', 'engraissement-petits-ruminants-bm'
-)
+where course.slug in ('biofertilisant-enrichi-fr', 'biofertilisant-enrichi-bm', 'engraissement-petits-ruminants-fr', 'engraissement-petits-ruminants-bm')
 on conflict (course_id, position) do nothing;

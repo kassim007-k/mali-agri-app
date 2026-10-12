@@ -180,6 +180,23 @@ export async function getMyProfile(userId: string): Promise<AgriProfile | null> 
   return data;
 }
 
+export async function sendNotification(userId: string, title: string, content: string): Promise<void> {
+  const { error } = await supabase.from('agri_notifications').insert({
+    user_id: userId,
+    title: title.trim(),
+    content: content.trim(),
+  });
+  throwIfError(error);
+}
+
+export async function broadcastMessage(title: string, content: string): Promise<void> {
+  const { error } = await supabase.rpc('broadcast_agri_message', {
+    msg_title: title,
+    msg_content: content,
+  });
+  throwIfError(error);
+}
+
 export type AdminSnapshot = {
   profiles: AgriProfile[];
   courses: AgriCourse[];

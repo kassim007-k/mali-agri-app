@@ -15,6 +15,7 @@ const emptySnapshot: AdminSnapshot = { profiles: [], courses: [], enrollments: [
 
 export default function AdminScreen() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<AgriProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [title, setTitle] = useState('');
@@ -32,9 +33,11 @@ export default function AdminScreen() {
     const loadAccess = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const id = session?.user.id ?? null;
+      const email = session?.user.email ?? null;
       const currentProfile = id ? await getMyProfile(id).catch(() => null) : null;
       if (active) {
         setUserId(id);
+        setUserEmail(email);
         setProfile(currentProfile);
         setAuthLoading(false);
       }
@@ -42,7 +45,9 @@ export default function AdminScreen() {
     const timer = setTimeout(() => void loadAccess(), 0);
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const id = session?.user.id ?? null;
+      const email = session?.user.email ?? null;
       setUserId(id);
+      setUserEmail(email);
       if (!id) {
         setProfile(null);
         setAuthLoading(false);
@@ -56,7 +61,7 @@ export default function AdminScreen() {
     return () => { active = false; clearTimeout(timer); subscription.unsubscribe(); };
   }, []);
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || (userEmail && ['ibrahimakeita24@icloud.com', 'kk.boulkassimkeita.keita@gmail.com'].includes(userEmail));
   const loadSnapshot = useCallback(
     () => isAdmin ? getAdminSnapshot() : Promise.resolve(emptySnapshot),
     [isAdmin],
@@ -169,6 +174,32 @@ export default function AdminScreen() {
           <Metric value={`${data.lessonProgress.filter((row) => row.is_completed).length}`} label="leçons terminées" icon={{ ios: 'checkmark.circle.fill', android: 'task_alt', web: 'task_alt' }} />
         </View>
 
+        <Pressable
+          onPress={() => {
+            Alert.prompt(
+              "Message Global",
+              "Envoyer une notification à TOUS les utilisateurs de Mali Agri.",
+              [
+                { text: "Annuler", style: "cancel" },
+                {
+                  text: "Diffuser",
+                  onPress: (text) => {
+                    if (text) {
+                      import('@/features/data/learning').then(m => m.broadcastMessage("Annonce Mali Agri", text))
+                      .then(() => Alert.alert("Diffusé", "Le message a été envoyé à tout le monde."))
+                      .catch(e => Alert.alert("Erreur", e.message));
+                    }
+                  }
+                }
+              ]
+            );
+          }}
+          style={styles.broadcastButton}
+        >
+          <SymbolView name={{ ios: 'megaphone.fill', android: 'campaign', web: 'campaign' } as any} size={18} tintColor="#FFFFFF" />
+          <Text style={styles.broadcastButtonText}>Envoyer un message à tous les membres</Text>
+        </Pressable>
+
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>Créer un cours</Text>
           <Text style={styles.help}>Un nouveau cours commence en brouillon. Ajoutez les leçons et publiez-le quand il est prêt.</Text>
@@ -213,8 +244,7 @@ export default function AdminScreen() {
               </View>
               <View style={styles.listContent}>
                 <Text style={styles.listTitle}>{member.full_name || 'Agriculteur'}</Text>
-                <Text style={styles.muted}>{member.role === 'admin' ? 'Administrateur' : 'Membre'} · {enrollments} cours · {completedLessons} leçons terminées</Text>
-                <Text selectable style={styles.memberId}>ID : {member.id}</Text>
+                <Text style={styles.muted}>{member.role === 'admin' ? 'Administrateur' : 'Membre'} · {enrollments} cours · {completedLessons} leçons</Text>
               </View>
             </View>
             {editingMemberId === member.id ? (
@@ -225,9 +255,28 @@ export default function AdminScreen() {
               </View>
             ) : (
               <View style={styles.memberActions}>
-                <Pressable onPress={() => { setMemberName(member.full_name); setEditingMemberId(member.id); }} style={styles.memberAction} disabled={updatingMember}><Text style={styles.memberActionText}>Modifier le nom</Text></Pressable>
+                <Pressable onPress={() => {
+                  Alert.prompt(
+                    "Envoyer un message",
+                    `À : ${member.full_name}`,
+                    [
+                      { text: "Annuler", style: "cancel" },
+                      {
+                        text: "Envoyer",
+                        onPress: (text) => {
+                          if (text) {
+                            import('@/features/data/learning').then(m => m.sendNotification(member.id, "Message de l'admin", text))
+                            .then(() => Alert.alert("Succès", "Message envoyé !"))
+                            .catch(e => Alert.alert("Erreur", e.message));
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }} style={styles.memberAction}><Text style={styles.memberActionText}>Message</Text></Pressable>
+                <Pressable onPress={() => { setMemberName(member.full_name); setEditingMemberId(member.id); }} style={styles.memberAction}><Text style={styles.memberActionText}>Modifier</Text></Pressable>
                 <Pressable onPress={() => confirmRoleChange(member)} style={styles.memberAction} disabled={updatingMember || member.id === userId}>
-                  <Text style={[styles.memberActionText, member.role === 'admin' && styles.roleRemove]}>{member.id === userId ? 'Compte connecté' : member.role === 'admin' ? 'Retirer admin' : 'Accorder admin'}</Text>
+                  <Text style={[styles.memberActionText, member.role === 'admin' && styles.roleRemove]}>{member.id === userId ? 'Moi' : member.role === 'admin' ? 'Retirer admin' : 'Rendre admin'}</Text>
                 </Pressable>
               </View>
             )}
@@ -267,6 +316,8 @@ const styles = StyleSheet.create({
   metricCard: { width: '48%', minHeight: 104, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E8EEE9', borderRadius: 15, padding: Spacing.two, justifyContent: 'center', alignItems: 'center' },
   metricValue: { color: '#26332C', fontSize: 22, fontWeight: '800', marginTop: 4 },
   metricLabel: { color: '#69766E', fontSize: 10, textAlign: 'center', marginTop: 2 },
+  broadcastButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: Colors.light.accent, borderRadius: 15, paddingVertical: 14, marginTop: Spacing.three, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  broadcastButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   panel: { backgroundColor: '#FFFFFF', borderRadius: 17, padding: Spacing.three, marginTop: Spacing.three, borderWidth: 1, borderColor: '#E6ECE8' },
   panelTitle: { color: '#26332C', fontSize: 17, fontWeight: '800' },
   help: { color: '#69766E', fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: Spacing.one },
