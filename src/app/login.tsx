@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, Aler
 import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
+import { normalizePhoneNumber } from '@/features/auth/phone';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginScreen() {
@@ -11,8 +12,9 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!phone || !password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+    const normalizedPhone = normalizePhoneNumber(phone);
+    if (!normalizedPhone || !password) {
+      Alert.alert('Numéro invalide', 'Saisissez un numéro malien à 8 chiffres ou un numéro international au format + indicatif.');
       return;
     }
 
@@ -20,7 +22,7 @@ export default function LoginScreen() {
 
     // Pour se connecter avec le téléphone et le mot de passe sur Supabase
     const { error } = await supabase.auth.signInWithPassword({
-      phone: phone,
+      phone: normalizedPhone,
       password: password,
     });
 
@@ -52,8 +54,11 @@ export default function LoginScreen() {
           onChangeText={setPhone}
           keyboardType="phone-pad"
           autoCapitalize="none"
-          disabled={loading}
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          editable={!loading}
         />
+        <Text style={styles.hint}>Mali : 8 chiffres ou +223 suivi du numéro. Autres pays : ajoutez l’indicatif international.</Text>
 
         <Text style={styles.label}>Mot de passe</Text>
         <TextInput
@@ -62,7 +67,7 @@ export default function LoginScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          disabled={loading}
+          editable={!loading}
         />
 
         <TouchableOpacity
@@ -109,6 +114,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.one,
     marginTop: Spacing.three,
   },
+  hint: { color: '#68756C', fontSize: 12, lineHeight: 17, marginTop: Spacing.one },
   input: {
     backgroundColor: '#FFFFFF',
     padding: Spacing.three,

@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, Aler
 import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
+import { normalizePhoneNumber } from '@/features/auth/phone';
 import { supabase } from '@/lib/supabase';
 
 export default function RegisterScreen() {
@@ -22,27 +23,37 @@ export default function RegisterScreen() {
       return;
     }
 
+    const normalizedPhone = normalizePhoneNumber(phone);
+    if (!normalizedPhone) {
+      Alert.alert('Numéro invalide', 'Saisissez un numéro malien à 8 chiffres ou un numéro international au format + indicatif.');
+      return;
+    }
+
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({
-      phone: phone,
-      password: password,
-      options: {
-        data: {
-          full_name: fullName,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        phone: normalizedPhone,
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      Alert.alert('Erreur d\'inscription', error.message);
+      if (error) {
+        Alert.alert('Erreur d’inscription', error.message);
+      } else if (data.session) {
+        Alert.alert('Compte créé', 'Votre compte est prêt.');
+        router.replace('/(tabs)/home');
+      } else {
+        router.replace({ pathname: '/verify-phone', params: { phone: normalizedPhone } });
+      }
+    } catch {
+      Alert.alert('Erreur d’inscription', 'Vérifiez votre connexion puis réessayez.');
+    } finally {
       setLoading(false);
-    } else {
-      Alert.alert(
-        'Succès',
-        'Compte créé avec succès ! Si la confirmation par SMS est activée, vous recevrez un code.'
-      );
-      router.replace('/(tabs)/home');
     }
   };
 
@@ -63,7 +74,7 @@ export default function RegisterScreen() {
           placeholder="Abdoul Wahab"
           value={fullName}
           onChangeText={setFullName}
-          disabled={loading}
+          editable={!loading}
         />
 
         <Text style={styles.label}>Numéro de téléphone</Text>
@@ -74,8 +85,11 @@ export default function RegisterScreen() {
           onChangeText={setPhone}
           keyboardType="phone-pad"
           autoCapitalize="none"
-          disabled={loading}
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          editable={!loading}
         />
+        <Text style={styles.hint}>Mali : 8 chiffres ou +223 suivi du numéro. Un code SMS peut être demandé pour confirmer le compte.</Text>
 
         <Text style={styles.label}>Mot de passe</Text>
         <TextInput
@@ -84,7 +98,7 @@ export default function RegisterScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          disabled={loading}
+          editable={!loading}
         />
 
         <Text style={styles.label}>Confirmer le mot de passe</Text>
@@ -94,7 +108,7 @@ export default function RegisterScreen() {
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
-          disabled={loading}
+          editable={!loading}
         />
 
         <TouchableOpacity
@@ -105,7 +119,7 @@ export default function RegisterScreen() {
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.buttonText}>S'inscrire</Text>
+            <Text style={styles.buttonText}>S’inscrire</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -148,6 +162,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     fontSize: 16,
   },
+  hint: { color: '#68756C', fontSize: 12, lineHeight: 17, marginTop: Spacing.one },
   button: {
     backgroundColor: Colors.light.accent,
     padding: Spacing.three,

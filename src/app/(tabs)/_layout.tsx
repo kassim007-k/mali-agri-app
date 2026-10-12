@@ -19,7 +19,7 @@ export default function TabsLayout() {
         options={{
           title: 'Formations',
           tabBarIcon: ({ color }) => (
-            <SymbolView name="book.fill" size={24} tintColor={color} />
+            <SymbolView name={{ ios: 'book.fill', android: 'menu_book', web: 'menu_book' } as any} size={24} tintColor={color} />
           ),
         }}
       />
@@ -33,7 +33,7 @@ export default function TabsLayout() {
               focused ? styles.activeIconContainer : styles.inactiveIconContainer
             ]}>
               <SymbolView
-                name="house.fill"
+                name={{ ios: 'house.fill', android: 'home', web: 'home' } as any}
                 size={28}
                 tintColor={focused ? '#FFFFFF' : '#FFFFFF'}
               />
@@ -46,7 +46,7 @@ export default function TabsLayout() {
         options={{
           title: 'Paramètres',
           tabBarIcon: ({ color }) => (
-            <SymbolView name="gearshape.fill" size={24} tintColor={color} />
+            <SymbolView name={{ ios: 'gearshape.fill', android: 'settings', web: 'settings' } as any} size={24} tintColor={color} />
           ),
         }}
       />
