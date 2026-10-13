@@ -13,12 +13,12 @@ export default function WelcomeScreen() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const email = session.user.email?.toLowerCase().trim();
+        const email = session.user.email?.toLowerCase().trim() || '';
         const { data: profile } = await supabase.from('agri_profiles').select('role').eq('id', session.user.id).single();
 
-        const isAdmin = profile?.role === 'admin' ||
-                        email === 'ibrahimakeita24@icloud.com' ||
-                        email === 'kk.boulkassimkeita.keita@gmail.com';
+        const isAdmin = (profile?.role === 'admin') ||
+                        (email === 'ibrahimakeita24@icloud.com') ||
+                        (email === 'kk.boulkassimkeita.keita@gmail.com');
 
         if (isAdmin) {
           router.replace('/(tabs)/settings/admin');

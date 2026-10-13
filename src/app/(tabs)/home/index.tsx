@@ -38,7 +38,7 @@ export default function HomeScreen() {
 
         if (active) {
           const role = profile?.role ?? 'user';
-          const email = user?.email?.toLowerCase().trim();
+          const email = user?.email?.toLowerCase().trim() || '';
           const isAdmin = role === 'admin' ||
                           email === 'ibrahimakeita24@icloud.com' ||
                           email === 'kk.boulkassimkeita.keita@gmail.com';

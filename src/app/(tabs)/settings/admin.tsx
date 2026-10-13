@@ -49,7 +49,7 @@ export default function AdminScreen() {
       if (!active) return;
 
       const id = session?.user.id ?? null;
-      const email = session?.user.email ?? null;
+      const email = session?.user.email?.toLowerCase().trim() ?? null;
       setUserId(id);
       setUserEmail(email);
 
