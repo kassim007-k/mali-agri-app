@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View, TouchableOpacity, Platform } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 
@@ -44,12 +44,6 @@ export default function HomeScreen() {
                           email === 'kk.boulkassimkeita.keita@gmail.com';
 
           setUserRole(isAdmin ? 'admin' : role);
-
-          // REDIRECTION AUTOMATIQUE SI ADMIN
-          if (isAdmin) {
-            console.log("ACCÈS ADMIN FORCÉ POUR :", email);
-            router.replace('/(tabs)/settings/admin');
-          }
         }
       } else {
         setUserId(null);
@@ -89,18 +83,16 @@ export default function HomeScreen() {
         <View style={styles.hero}>
           <View style={styles.heroHeader}>
             <Text style={styles.eyebrow}>{userId ? 'MALI AGRI · VOTRE ESPACE' : 'MALI AGRI · APPRENDRE'}</Text>
-            {userId && (
-              <View style={{ flexDirection: 'row', gap: 15 }}>
-                {userRole === 'admin' && (
-                  <TouchableOpacity onPress={() => router.push('/(tabs)/settings/admin')}>
-                    <SymbolView name="shield.fill" size={20} tintColor="#FFFFFF" />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
-                  <SymbolView name="bell.fill" size={20} tintColor="#B9CDBF" />
+            <View style={{ flexDirection: 'row', gap: 15 }}>
+              {userId && userRole === 'admin' && (
+                <TouchableOpacity onPress={() => router.push('/(tabs)/settings/admin')}>
+                  <SymbolView name="shield.fill" size={20} tintColor="#FFFFFF" />
                 </TouchableOpacity>
-              </View>
-            )}
+              )}
+              <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
+                <SymbolView name="bell.fill" size={22} tintColor="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </View>
           <Text style={styles.title}>{userId ? (userName ? `Bonjour, ${userName}` : 'Votre progression') : 'Bienvenue sur Mali Agri'}</Text>
           <Text style={styles.subtitle}>
@@ -226,7 +218,7 @@ function LearningCard({ item }: { item: CourseProgress }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F6F8F6' },
   content: { paddingBottom: 130 },
-  hero: { backgroundColor: Colors.light.primary, paddingHorizontal: Spacing.four, paddingTop: Spacing.four, paddingBottom: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  hero: { backgroundColor: Colors.light.primary, paddingHorizontal: Spacing.four, paddingTop: Platform.OS === 'ios' ? 0 : Spacing.four, paddingBottom: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
   eyebrow: { color: '#B9CDBF', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },

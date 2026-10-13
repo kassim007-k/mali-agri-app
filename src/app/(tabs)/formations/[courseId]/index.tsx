@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 import { Colors, Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
-import { createLesson, enrollInCourse, getCourse, getLessons, getMyEnrollment, getMyProfile, setCoursePublished, updateCourse, updateLesson } from '@/features/data/learning';
+import { createLesson, enrollInCourse, getCourse, getLessons, getMyEnrollment, getMyProfile, setCoursePublished, updateCourse, updateLesson, deleteLesson } from '@/features/data/learning';
 import type { AgriCourse, AgriEnrollment, AgriLesson } from '@/features/data/database.types';
 import { useLiveQuery } from '@/features/data/use-live-query';
 
@@ -279,7 +279,32 @@ export default function CourseDetailScreen() {
               </View>
               <SymbolView name={{ ios: isEnrolled || isAdmin ? 'play.circle.fill' : 'lock.fill', android: isEnrolled || isAdmin ? 'play_circle' : 'lock', web: isEnrolled || isAdmin ? 'play_circle' : 'lock' } as any} size={22} tintColor={Colors.light.accent} />
             </Pressable>
-            {isAdmin ? <Pressable onPress={() => beginLessonEdit(lesson)} style={styles.editLessonButton}><Text style={styles.editLessonText}>Modifier cette leçon</Text></Pressable> : null}
+            {isAdmin ? (
+              <View style={styles.lessonActions}>
+                <Pressable onPress={() => beginLessonEdit(lesson)} style={styles.editLessonButton}><Text style={styles.editLessonText}>Modifier</Text></Pressable>
+                <Pressable
+                  onPress={() => {
+                    Alert.alert('Supprimer la leçon', 'Voulez-vous vraiment supprimer cette leçon ?', [
+                      { text: 'Annuler', style: 'cancel' },
+                      { text: 'Supprimer', style: 'destructive', onPress: async () => {
+                        setActionLoading(true);
+                        try {
+                          await deleteLesson(lesson.id);
+                          await refresh();
+                        } catch (err) {
+                          Alert.alert('Erreur', 'Impossible de supprimer la leçon.');
+                        } finally {
+                          setActionLoading(false);
+                        }
+                      }}
+                    ]);
+                  }}
+                  style={styles.editLessonButton}
+                >
+                  <Text style={[styles.editLessonText, { color: '#e74c3c' }]}>Supprimer</Text>
+                </Pressable>
+              </View>
+            ) : null}
             {editingLessonId === lesson.id ? (
               <View style={styles.editCard}>
                 <TextInput value={lessonTitle} onChangeText={setLessonTitle} placeholder="Titre" style={styles.input} editable={!actionLoading} />
@@ -365,7 +390,8 @@ const styles = StyleSheet.create({
   lessonNumberText: { color: Colors.light.primary, fontWeight: '800', fontSize: 13 },
   lessonDetails: { flex: 1, marginHorizontal: Spacing.two },
   lessonTitle: { color: '#26332C', fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  editLessonButton: { alignSelf: 'flex-start', marginHorizontal: Spacing.three, marginBottom: Spacing.two, paddingVertical: 7 },
+  editLessonButton: { paddingVertical: 7, paddingHorizontal: 10 },
+  lessonActions: { flexDirection: 'row', paddingHorizontal: Spacing.two, gap: 5 },
   editLessonText: { color: Colors.light.primary, fontSize: 12, fontWeight: '800' },
   emptyBox: { alignItems: 'center', padding: Spacing.four, borderRadius: 16, backgroundColor: '#FFFFFF', gap: 7 },
   emptyTitle: { color: '#26332C', fontSize: 15, fontWeight: '800', textAlign: 'center' },

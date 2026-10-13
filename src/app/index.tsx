@@ -1,7 +1,9 @@
+import React from 'react';
 import { router } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View, Text, SafeAreaView } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { supabase } from '@/lib/supabase';
 
 export default function WelcomeScreen() {
   const theme = useTheme();
